@@ -4,85 +4,80 @@ import History from '@/components/History';
 type CommandEntity = ExtendedCommand | ((...args: any[]) => ExtendedCommand | void);
 
 export interface IActions {
-    [actionName: string]: CommandEntity;
+  [actionName: string]: CommandEntity;
 }
 
 export interface IStrategy {
-    doAction(...args: any[]): void;
-    init(): void;
+  doAction(...args: any[]): void;
+  init(): void;
 }
 
-class Undo extends Command<History, null>{
-    history!: History;
-    needHistory: boolean = true;
+class Undo extends Command<History, null> {
+  history!: History;
+  needHistory: boolean = true;
 
-    execute(): boolean {
-        const command = this.history.pop();
+  execute(): boolean {
+    const command = this.history.pop();
 
-        if (command) {
-            command.undo();
-        }
-
-        return false;
+    if (command) {
+      command.undo();
     }
 
-    undo(): void {
-        return;
-    }
+    return false;
+  }
 
-    protected backup(): void {
-        return;
-    }
+  undo(): void { }
+
+  protected backup(): void { }
 }
 
 export default class ControlStrategy<Subject> {
-    protected actions: IActions = {};
-    protected history: History;
-    protected subject: Subject;
-    protected undo: ExtendedCommand = Undo;
-    protected undoAction: string = '';
+  protected actions: IActions = {};
+  protected history: History;
+  protected subject: Subject;
+  protected undo: ExtendedCommand = Undo;
+  protected undoAction: string = '';
 
-    constructor(subject: Subject, history: History) {
-        this.history = history;
-        this.subject = subject;
+  constructor(subject: Subject, history: History) {
+    this.history = history;
+    this.subject = subject;
+  }
+
+  init(): void { }
+
+  doAction(actionName: string, ...args: Array<any>): void {
+    if (!this.actions[actionName]) {
+      return;
     }
 
-    init(): void {
-        return;
+    const commandEntity = this.actions[actionName];
+    const CommandConstructor = this.isCommandConstructor(commandEntity)
+      ? commandEntity
+      : commandEntity(...args);
+
+    if (!CommandConstructor) {
+      return;
     }
 
-    doAction(actionName: string, ...args: Array<any>): void {
-        if (!this.actions[actionName]) {
-            return;
-        }
+    const command = new CommandConstructor(this.subject);
 
-        const commandEntity = this.actions[actionName];
-        const CommandConstructor = this.isCommandConstructor(commandEntity)
-            ? commandEntity
-            : commandEntity(...args);
-
-        if (!CommandConstructor) {
-            return;
-        }
-
-        const command = new CommandConstructor(this.subject);
-
-        if (this.isUndoCommand(command)) {
-            command.history = this.history;
-        }
-
-        const canSave = command.execute(...args);
-
-        if (canSave) {
-            this.history.push(command);
-        }
+    if (this.isUndoCommand(command)) {
+      command.history = this.history;
     }
 
-    protected isCommandConstructor(cmdEntity: CommandEntity): cmdEntity is ExtendedCommand {
-        return Command.isPrototypeOf(cmdEntity);
-    }
+    const canSave = command.execute(...args);
 
-    protected isUndoCommand(command: ICommand): command is Undo {
-        return (command as Undo).needHistory;
+    if (canSave) {
+      this.history.push(command);
     }
+  }
+
+  protected isCommandConstructor(cmdEntity: CommandEntity): cmdEntity is ExtendedCommand {
+    // @ts-ignore: temporary
+    return Command.isPrototypeOf(cmdEntity);
+  }
+
+  protected isUndoCommand(command: ICommand): command is Undo {
+    return (command as Undo).needHistory;
+  }
 }

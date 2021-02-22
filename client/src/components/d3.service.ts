@@ -1,139 +1,144 @@
+/* eslint-disable */
 import * as d3 from 'd3';
-import ForceDirectedGraph, {d3Node, d3Link} from './ForceDirectedGraph';
+import ForceDirectedGraph, { d3Node, d3Link } from './ForceDirectedGraph';
 
-type d3Selection = d3.Selection<SVGGElement, unknown, null, undefined>;
+// type d3Selection = d3.Selection<SVGGElement, unknown, null, undefined>;
+
+type d3Event = {
+  transform: { x: number; y: number; k: number }
+}
 
 export default class D3Service {
-    protected element!: d3.Selection<Element, unknown, null, undefined>;
-    protected scale: number = 1;
-    protected transform: [number, number] = [0, 0];
+  protected element!: d3.Selection<Element, unknown, null, undefined>;
+  protected scale: number = 1;
+  protected transform: [number, number] = [0, 0];
 
-    setElement(element: Element): void {
-        this.element = d3.select(element);
+  setElement(element: Element): void {
+    this.element = d3.select(element);
+  }
+
+  protected transformCoord(coord: number, transformIndex: number): number {
+    return (coord - this.transform[transformIndex]) / this.scale;
+  }
+
+  transformCoordinates(x: number, y: number): [number, number];
+  transformCoordinates(x: [number, number], y: any): [number, number];
+  transformCoordinates(x: any, y: any): any {
+    if (x instanceof Array) {
+      return [
+        this.transformCoord(x[0], 0),
+        this.transformCoord(x[1], 1)
+      ];
     }
 
-    protected transformCoord(coord: number, transformIndex: number): number {
-        return (coord - this.transform[transformIndex]) / this.scale;
+    return [
+      this.transformCoord(x, 0),
+      this.transformCoord(y, 1)
+    ];
+  }
+
+  applyZoomableBehaviour(zoomableElement: Element): void {
+    const zoomable = d3.select(zoomableElement);
+
+    const zoomed = ({ transform }: d3Event): void => {
+      zoomable.attr('transform', transform as unknown as string);
+      this.transform = [transform.x, transform.y];
+      this.scale = transform.k;
     }
 
-    transformCoordinates(x: number, y: number): [number, number];
-    transformCoordinates(x: [number, number], y: any): [number, number];
-    transformCoordinates(x: any, y: any): any {
-        if (x instanceof Array) {
-            return [
-                this.transformCoord(x[0], 0),
-                this.transformCoord(x[1], 1)
-            ];
-        }
+    // const onEnd = (): void => {
+    //   if (d3.event.sourceEvent) {
+    //     onZoomEnd(d3.event.sourceEvent);
+    //   }
+    // }
 
-        return [
-            this.transformCoord(x, 0),
-            this.transformCoord(y, 1)
-        ]
-    }
+    const zoom = d3.zoom()
+      // allows  panning on left or middle mouse buttons
+      // .filter(() => d3.event.button === 0 || d3.event.button === 1)
+      .on('zoom', zoomed);
+      // .on('end', onEnd);
 
-    applyZoomableBehaviour(zoomableElement: Element, onZoomEnd: Function): void {
-        const zoomable = d3.select(zoomableElement);
+    this.element.call(zoom)
+      .on('dblclick.zoom', null);
+  }
 
-        const zoomed = (): void => {
-            zoomable.attr('transform', d3.event.transform);
-            this.transform = [d3.event.transform.x, d3.event.transform.y];
-            this.scale = d3.event.transform.k;
-        }
+  static applyBrushBehaviour(element: Element,
+    isEnabled: () => boolean,
+    onBrushStartMoveCallback: Function,
+    onBrushEndCallback: Function): void {
+    // const d3Elem = d3.select(element) as unknown as d3Selection;
+    // let moveStarted = false;
 
-        const onEnd = (): void => {
-            if (d3.event.sourceEvent) {
-                onZoomEnd(d3.event.sourceEvent);
-            }
-        }
+    // function onBrush(): void {
+    //   if (d3.event.selection && !moveStarted) {
+    //     onBrushStartMoveCallback();
+    //     moveStarted = true;
+    //   }
+    // }
 
-        const zoom = d3.zoom()
-            // allows  panning on left or middle mouse buttons
-            .filter(() => d3.event.button === 0 || d3.event.button === 1)
-            .on('zoom', zoomed)
-            .on('end', onEnd);
+    // function onBrushEnd(): void {
+    //   if (d3.event.selection) {
+    //     onBrushEndCallback(d3.event.sourceEvent, d3.event.selection);
+    //     // eslint-disable-next-line
+    //     brush.move(d3Elem, null);
+    //     moveStarted = false;
+    //   }
+    // }
 
-        this.element.call(zoom)
-            .on('dblclick.zoom', null);
-    }
+    // const brush = d3.brush()
+    //   // default filter disables brush when ctrl key is pressed
+    //   // we allow selection on left mouse button only
+    //   .filter(() => d3.event.button === 0 && isEnabled())
+    //   // disabling brush fix size when shift key is pressed
+    //   .keyModifiers(false)
+    //   .on('brush', onBrush)
+    //   .on('end', onBrushEnd);
 
-    static applyBrushBehaviour(element: Element,
-                               isEnabled: () => boolean,
-                               onBrushStartMoveCallback: Function,
-                               onBrushEndCallback: Function): void {
-        const d3Elem = d3.select(element) as unknown as d3Selection;
-        let moveStarted = false;
+    // d3Elem
+    //   .call(brush)
+    //   .call((elem: d3Selection) => {
+    //     // disable native d3 crosshair cursor on brush
+    //     // for setting our cursor type depending on graph mode
+    //     elem.select('rect').attr('cursor', null);
+    //   });
+  }
 
-        function onBrush(): void {
-            if (d3.event.selection && !moveStarted) {
-                onBrushStartMoveCallback();
-                moveStarted = true;
-            }
-        }
+  static applyDraggableBehaviour(element: Element,
+    onStart: Function,
+    onMove: Function,
+    onEnd: Function): void {
+    // const d3Elem = d3.select(element);
 
-        function onBrushEnd(): void {
-            if (d3.event.selection) {
-                onBrushEndCallback(d3.event.sourceEvent, d3.event.selection);
-                // eslint-disable-next-line
-                brush.move(d3Elem, null);
-                moveStarted = false;
-            }
-        }
+    // function onDragStart(): void {
+    //   if (onStart) {
+    //     onStart(d3.event.dx, d3.event.dy, !!d3.event.active);
+    //   }
+    // }
 
-        const brush = d3.brush()
-            // default filter disables brush when ctrl key is pressed
-            // we allow selection on left mouse button only
-            .filter(() => d3.event.button === 0 && isEnabled())
-            // disabling brush fix size when shift key is pressed
-            .keyModifiers(false)
-            .on('brush', onBrush)
-            .on('end', onBrushEnd);
+    // function onDragMove(): void {
+    //   if (onMove) {
+    //     onMove(d3.event.dx, d3.event.dy, !!d3.event.active);
+    //   }
+    // }
 
-        d3Elem
-            .call(brush)
-            .call((elem: d3Selection) => {
-                // disable native d3 crosshair cursor on brush
-                // for setting our cursor type depending on graph mode
-                elem.select('rect').attr('cursor', null);
-            });
-    }
+    // function onDragEnd(): void {
+    //   if (onEnd) {
+    //     onEnd(null, null, !!d3.event.active, d3.event.sourceEvent);
+    //   }
+    // }
 
-    static applyDraggableBehaviour(element: Element,
-                                   onStart: Function,
-                                   onMove: Function,
-                                   onEnd: Function): void {
-        const d3Elem = d3.select(element);
+    // d3Elem.call(
+    //   d3.drag()
+    //     .on('start', onDragStart)
+    //     .on('drag', onDragMove)
+    //     .on('end', onDragEnd)
+    // );
+  }
 
-        function onDragStart(): void {
-            if (onStart) {
-                onStart(d3.event.dx, d3.event.dy, !!d3.event.active);
-            }
-        }
-
-        function onDragMove(): void {
-            if (onMove) {
-                onMove(d3.event.dx, d3.event.dy, !!d3.event.active);
-            }
-        }
-
-        function onDragEnd(): void {
-            if (onEnd) {
-                onEnd(null, null, !!d3.event.active, d3.event.sourceEvent);
-            }
-        }
-
-        d3Elem.call(
-            d3.drag()
-                .on('start', onDragStart)
-                .on('drag', onDragMove)
-                .on('end', onDragEnd)
-        );
-    }
-
-    static getForceDirectedGraph
-        <Node extends d3Node, Link extends d3Link<Node>>
-        (nodes: Array<Node>, links: Array<Link>): ForceDirectedGraph<Node, Link>
-    {
-        return new ForceDirectedGraph<Node, Link>(nodes, links);
-    }
+  static getForceDirectedGraph <
+    Node extends d3Node,
+    Link extends d3Link<Node>
+  >(nodes: Array<Node>, links: Array<Link>): ForceDirectedGraph<Node, Link> {
+    return new ForceDirectedGraph<Node, Link>(nodes, links);
+  }
 }

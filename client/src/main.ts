@@ -1,12 +1,7 @@
-import Vue from 'vue';
+import { createApp } from 'vue';
 import App from './App.vue';
+import './registerServiceWorker';
 import router from './router';
-import 'reflect-metadata';
-import { CombinedVueInstance } from 'vue/types/vue';
+import store from './store';
 
-Vue.config.productionTip = false;``
-
-new Vue({
-  router,
-  render: (h: any): CombinedVueInstance<any, any, any, any, any> => h(App)
-}).$mount('#app');
+createApp(App).use(store).use(router).mount('#app');
